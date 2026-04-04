@@ -77,22 +77,32 @@ model = xgb.XGBClassifier(
     objective='multi:softprob',
     num_class=len(le.classes_),
     eval_metric='mlogloss',
-    n_estimators=100,
-    learning_rate=0.1,
-    random_state=42
+    n_estimators=150,
+    learning_rate=0.08,
+    max_depth=6,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    random_state=42,
+    use_label_encoder=False
 )
 
-model.fit(X_train, y_train)
+model.fit(X_train, y_train, eval_set=[(X_test, y_test)], early_stopping_rounds=20, verbose=False)
 
 
 # =========================
 # 7. EVALUATE
 # =========================
 y_pred = model.predict(X_test)
-
-print("Accuracy:", accuracy_score(y_test, y_pred))
+acc = accuracy_score(y_test, y_pred)
+report = classification_report(y_test, y_pred, target_names=le.classes_, output_dict=True)
+print(f"Accuracy: {acc:.4f}")
 print("\nClassification Report:\n")
 print(classification_report(y_test, y_pred, target_names=le.classes_))
+
+# cross-validation for reliability
+from sklearn.model_selection import cross_val_score
+cv_scores = cross_val_score(model, X_weighted, y, cv=5, scoring='accuracy')
+print(f"5-fold CV accuracy: {np.mean(cv_scores):.4f} ± {np.std(cv_scores):.4f}")
 
 
 # =========================
@@ -124,4 +134,15 @@ joblib.dump(symptom_weights, "../models/weights.pkl")
 joblib.dump(desc_dict, "../models/desc.pkl")
 joblib.dump(prec_dict, "../models/prec.pkl")
 
-print("\nTraining complete. Models saved.")
+# persist training metrics
+import json
+metrics = {
+    'accuracy': float(acc),
+    'cv_mean_accuracy': float(np.mean(cv_scores)),
+    'cv_std_accuracy': float(np.std(cv_scores)),
+    'classification_report': report
+}
+with open('../models/metrics.json', 'w', encoding='utf-8') as f:
+    json.dump(metrics, f, indent=2)
+
+print("\nTraining complete. Models and metrics saved to ml/models.")
