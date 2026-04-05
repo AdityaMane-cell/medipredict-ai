@@ -5,7 +5,7 @@ import os
 
 DATABASE_URL = os.getenv(
     'DATABASE_URL',
-    'postgresql://healthai:healthai123@localhost:5432/healthai'
+    'postgresql://postgres:backend-sprint@localhost:5432/healthai'  # Use PostgreSQL for local development
 )
 
 engine = create_engine(DATABASE_URL, echo=False)

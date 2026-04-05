@@ -273,49 +273,71 @@ def list_symptoms():
 
 @app.post('/predict')
 def predict(req: SymptomRequest, current_user: Optional[models.User] = Depends(get_optional_user), db: Session = Depends(get_db)):
-    if not req.symptoms:
-        raise HTTPException(status_code=422, detail='symptoms list cannot be empty')
+    try:
+        if not req.symptoms:
+            raise HTTPException(status_code=422, detail='symptoms list cannot be empty')
 
-    result = predict_disease(req.symptoms)
-    if 'error' in result:
-        raise HTTPException(status_code=400, detail=result['error'])
+        logger.info(f"Prediction request with symptoms: {req.symptoms}")
+        result = predict_disease(req.symptoms)
+        logger.info(f"Prediction result: {result}")
+        
+        if 'error' in result:
+            raise HTTPException(status_code=400, detail=result['error'])
 
-    if current_user:
-        record = models.PredictionHistory(
-            user_id=current_user.id,
-            method='symptoms',
-            query=json.dumps(req.symptoms),
-            result=json.dumps(result),
-            confidence=str(result.get('confidence', '')),
-        )
-        db.add(record)
-        db.commit()
+        if current_user:
+            record = models.PredictionHistory(
+                user_id=current_user.id,
+                method='symptoms',
+                query=json.dumps(req.symptoms),
+                result=json.dumps(result),
+                confidence=str(result.get('confidence', '')),
+            )
+            db.add(record)
+            db.commit()
+            logger.info(f"Saved prediction history for user {current_user.id}")
 
-    return result
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Prediction error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 
 
 @app.post('/predict-text')
 def predict_text(req: TextRequest, current_user: Optional[models.User] = Depends(get_optional_user), db: Session = Depends(get_db)):
-    if not req.text or not req.text.strip():
-        raise HTTPException(status_code=422, detail='text cannot be empty')
+    try:
+        if not req.text or not req.text.strip():
+            raise HTTPException(status_code=422, detail='text cannot be empty')
 
-    symptoms = text_to_symptoms(req.text)
-    result = predict_disease(symptoms)
-    if 'error' in result:
-        raise HTTPException(status_code=400, detail=result['error'])
+        logger.info(f"Text prediction request: {req.text[:100]}")
+        symptoms = text_to_symptoms(req.text)
+        logger.info(f"Extracted symptoms: {symptoms}")
+        
+        result = predict_disease(symptoms)
+        logger.info(f"Prediction result: {result}")
+        
+        if 'error' in result:
+            raise HTTPException(status_code=400, detail=result['error'])
 
-    if current_user:
-        record = models.PredictionHistory(
-            user_id=current_user.id,
-            method='text',
-            query=json.dumps(req.text),
-            result=json.dumps(result),
-            confidence=str(result.get('confidence', '')),
-        )
-        db.add(record)
-        db.commit()
+        if current_user:
+            record = models.PredictionHistory(
+                user_id=current_user.id,
+                method='text',
+                query=json.dumps(req.text),
+                result=json.dumps(result),
+                confidence=str(result.get('confidence', '')),
+            )
+            db.add(record)
+            db.commit()
+            logger.info(f"Saved text prediction history for user {current_user.id}")
 
-    return {'extracted_symptoms': symptoms, 'prediction': result}
+        return {'extracted_symptoms': symptoms, 'prediction': result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Text prediction error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Text prediction error: {str(e)}")
 
 
 

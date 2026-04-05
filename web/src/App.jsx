@@ -95,64 +95,85 @@ function App() {
 
   const handleSignup = async (e) => {
     e.preventDefault();
+    setError("");
+    
     if (!username.trim() || !email.trim() || !password.trim()) {
       setError("Fill username, email, and password for signup");
       return;
     }
 
-    const res = await fetch(`${API_BASE}/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, email, password }),
-    });
-
-    if (!res.ok) {
-      const data = await res.json();
-      setError(data.detail || "Signup failed");
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters");
       return;
     }
 
-    const tokenRes = await fetch(`${API_BASE}/token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ username, password }),
-    });
+    try {
+      const registerRes = await fetch(`${API_BASE}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, email, password }),
+      });
 
-    if (!tokenRes.ok) {
-      const data = await tokenRes.json();
-      setError(data.detail || "Auto-login failed");
-      return;
+      if (!registerRes.ok) {
+        const errorData = await registerRes.json();
+        throw new Error(errorData.detail || "Signup failed");
+      }
+
+      const registerData = await registerRes.json();
+      console.log("Account created:", registerData);
+
+      const loginRes = await fetch(`${API_BASE}/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ username, password }),
+      });
+
+      if (!loginRes.ok) {
+        const errorData = await loginRes.json();
+        throw new Error(errorData.detail || "Login after signup failed");
+      }
+
+      const tokenData = await loginRes.json();
+      await setAuthSession(tokenData.access_token);
+      resetAuthForms();
+      setPage("app");
+      addAlert("✓ Account created and logged in successfully!", "success");
+    } catch (err) {
+      console.error("Signup error:", err);
+      setError(err.message || "An error occurred during signup");
     }
-
-    const tokenData = await tokenRes.json();
-    await setAuthSession(tokenData.access_token);
-    setPage("app");
-    resetAuthForms();
   };
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setError("");
+    
     if (!username.trim() || !password.trim()) {
       setError("Enter username and password to login");
       return;
     }
 
-    const res = await fetch(`${API_BASE}/token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ username, password }),
-    });
+    try {
+      const res = await fetch(`${API_BASE}/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ username, password }),
+      });
 
-    if (!res.ok) {
-      const data = await res.json();
-      setError(data.detail || "Invalid username or password");
-      return;
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.detail || "Invalid username or password");
+        return;
+      }
+
+      const tokenData = await res.json();
+      await setAuthSession(tokenData.access_token);
+      setPage("app");
+      resetAuthForms();
+      addAlert("Logged in successfully!", "info");
+    } catch (err) {
+      setError(err.message || "An error occurred during login");
     }
-
-    const tokenData = await res.json();
-    await setAuthSession(tokenData.access_token);
-    setPage("app");
-    resetAuthForms();
   };
 
   const handleLogout = () => {
@@ -229,7 +250,10 @@ function App() {
     setLoading(true);
     setError("");
     setResult(null);
+    
     try {
+      console.log(`Calling API: ${API_BASE}/${endpoint}`, payload);
+      
       const res = await fetch(`${API_BASE}/${endpoint}`, {
         method: "POST",
         headers: {
@@ -238,22 +262,40 @@ function App() {
         },
         body: JSON.stringify(payload),
       });
+      
+      console.log(`Response status: ${res.status}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Prediction failed");
+      console.log("API Response:", data);
+      
+      if (!res.ok) {
+        throw new Error(data.detail || data.error || "Prediction failed");
+      }
+      
+      if (!data || Object.keys(data).length === 0) {
+        throw new Error("Empty response from server");
+      }
+      
       setResult(data);
+      addAlert("✓ Prediction complete!", "success");
 
       if (user) {
-        const historyRes = await fetch(`${API_BASE}/history`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (historyRes.ok) {
-          setHistory(await historyRes.json());
+        try {
+          const historyRes = await fetch(`${API_BASE}/history`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (historyRes.ok) {
+            setHistory(await historyRes.json());
+          }
+        } catch (histErr) {
+          console.warn("Could not fetch history:", histErr);
         }
       }
     } catch (err) {
-      setError(err.message);
+      console.error("Prediction error:", err);
+      setError(err.message || "Failed to get prediction. Please try again.");
+      addAlert(err.message || "Prediction failed", "error");
     } finally {
       setLoading(false);
     }
@@ -281,18 +323,17 @@ function App() {
     return (
       <div className="app-shell home-shell">
         <div className="home-card">
-          <h1>Health AI Prediction</h1>
+          <h1>
+            <span className="home-emoji" role="img" aria-label="hospital">🏥</span>
+            <span className="home-title-text">Health AI</span>
+          </h1>
           <p>
-            Start anonymously or login/sign up to save your prediction history
-            and profile.
+            Discover potential health conditions based on your symptoms. Start anonymously or create an account to save your history.
           </p>
           <div className="home-actions">
             <button
               className="primary"
-              onClick={() => {
-                setPage("app");
-                enableGuestMode();
-              }}
+              onClick={() => enableGuestMode()}
             >
               Continue as Guest
             </button>
@@ -309,8 +350,8 @@ function App() {
     return (
       <div className="app-shell auth-shell">
         <div className="auth-card">
-          <h1>Health AI Gateway</h1>
-          <p>Login or sign up to keep track of your predictions.</p>
+          <h1>Health AI</h1>
+          <p>Manage your health predictions securely</p>
 
           <div className="auth-switch">
             <button
@@ -318,6 +359,7 @@ function App() {
               onClick={() => {
                 setAuthMode("login");
                 setError("");
+                resetAuthForms();
               }}
             >
               Login
@@ -327,6 +369,7 @@ function App() {
               onClick={() => {
                 setAuthMode("signup");
                 setError("");
+                resetAuthForms();
               }}
             >
               Sign Up
@@ -361,7 +404,7 @@ function App() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
+              placeholder="Enter password"
               required
             />
 
@@ -371,6 +414,19 @@ function App() {
               {authMode === "login" ? "Sign In" : "Create Account"}
             </button>
           </form>
+
+          <div style={{ marginTop: "16px", textAlign: "center" }}>
+            <button 
+              className="secondary" 
+              onClick={() => {
+                setPage("home");
+                setError("");
+              }}
+              style={{ width: "100%", marginTop: "8px" }}
+            >
+              Back to Home
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -378,156 +434,108 @@ function App() {
 
   return (
     <div className="app-shell app-layout">
-      <aside className="sidebar">
-        <div className="account-card">
-          <h3>{user.username}</h3>
-          <small>{user.email}</small>
-          <button className="secondary" onClick={handleLogout}>
-            Logout
-          </button>
-        </div>
+      {user && (
+        <aside className="sidebar">
+          <div className="account-card">
+            <h3>{user.username}</h3>
+            <small>{user.email}</small>
+            <button className="secondary" onClick={handleLogout}>
+              Logout
+            </button>
+          </div>
 
-        <div className="sidebar-tabs">
-          <button
-            className={sidebarTab === "history" ? "active" : ""}
-            onClick={() => setSidebarTab("history")}
-          >
-            History
-          </button>
-          <button
-            className={sidebarTab === "profile" ? "active" : ""}
-            onClick={() => setSidebarTab("profile")}
-          >
-            Profile
-          </button>
-        </div>
+          <div className="sidebar-tabs">
+            <button
+              className={sidebarTab === "history" ? "active" : ""}
+              onClick={() => setSidebarTab("history")}
+            >
+              History
+            </button>
+            <button
+              className={sidebarTab === "profile" ? "active" : ""}
+              onClick={() => setSidebarTab("profile")}
+            >
+              Profile
+            </button>
+          </div>
 
-        <div className="sidebar-content">
-          {sidebarTab === "history" ? (
-            <div className="history-list">
-              <h4>Prediction History</h4>
-              {history.length === 0 ? (
-                <p>No history yet. Run predictions to save entries.</p>
-              ) : (
-                <ul>
-                  {history.map((item) => (
-                    <li key={item.id}>
-                      <div>
-                        <strong>
-                          {new Date(item.created_at).toLocaleString()}
-                        </strong>
-                        <span>
-                          {item.method === "symptoms" ? "Symptom" : "Text"}
-                        </span>
-                      </div>
-                      <div className="history-query">
-                        {item.method === "symptoms"
-                          ? item.query.join(", ")
-                          : item.query}
-                      </div>
-                      <div className="history-result">
-                        Top 1 {item.result?.top3?.[0]?.[0] || "N/A"} (
-                        {item.result?.confidence != null
-                          ? `${(item.result.confidence * 100).toFixed(1)}%`
-                          : "--"}
-                        )
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ) : (
-            <div className="profile-view">
-              <h4>Account Profile</h4>
-              <p>
-                <strong>Username:</strong> {user.username}
-              </p>
-              <p>
-                <strong>Email:</strong> {user.email}
-              </p>
-              <p>
-                <strong>Predictions made:</strong> {history.length}
-              </p>
-              <p>
-                <strong>2FA:</strong>{" "}
-                {user.totp_enabled === "true" ? "Enabled" : "Disabled"}
-              </p>
-              {user.totp_enabled !== "true" ? (
-                <button
-                  className="secondary"
-                  onClick={async () => {
-                    const setupRes = await fetch(`${API_BASE}/2fa/setup`, {
-                      method: "POST",
-                      headers: { Authorization: `Bearer ${token}` },
-                    });
-                    if (!setupRes.ok) {
-                      addAlert("2FA setup failed", "error");
-                      return;
-                    }
-                    const data = await setupRes.json();
-                    const code = prompt(
-                      "Enter code from your authenticator app:",
-                    );
-                    if (!code) return;
-
-                    const enableRes = await fetch(`${API_BASE}/2fa/enable`, {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                      },
-                      body: JSON.stringify({ code }),
-                    });
-
-                    if (!enableRes.ok) {
-                      const err = await enableRes.json();
-                      addAlert(err.detail || "2FA enable failed", "error");
-                      return;
-                    }
-                    addAlert("2FA enabled", "success");
-                    setUser({ ...user, totp_enabled: "true" });
-                  }}
-                >
-                  Enable 2FA
-                </button>
-              ) : (
-                <button
-                  className="secondary"
-                  onClick={async () => {
-                    const code = prompt("Enter TOTP code to disable 2FA:");
-                    if (!code) return;
-                    const disableRes = await fetch(`${API_BASE}/2fa/disable`, {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                      },
-                      body: JSON.stringify({ code }),
-                    });
-                    if (!disableRes.ok) {
-                      const err = await disableRes.json();
-                      addAlert(err.detail || "2FA disable failed", "error");
-                      return;
-                    }
-                    addAlert("2FA disabled", "success");
-                    setUser({ ...user, totp_enabled: "false" });
-                  }}
-                >
-                  Disable 2FA
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </aside>
+          <div className="sidebar-content">
+            {sidebarTab === "history" ? (
+              <div className="history-list">
+                <h4>Prediction History</h4>
+                {history.length === 0 ? (
+                  <p>No history yet. Run predictions to save entries.</p>
+                ) : (
+                  <ul>
+                    {history.map((item) => (
+                      <li key={item.id}>
+                        <div>
+                          <strong>
+                            {new Date(item.created_at).toLocaleString()}
+                          </strong>
+                          <span>
+                            {item.method === "symptoms" ? "Symptom" : "Text"}
+                          </span>
+                        </div>
+                        <div className="history-query">
+                          {item.method === "symptoms"
+                            ? item.query.join(", ")
+                            : item.query}
+                        </div>
+                        <div className="history-result">
+                          Top 1 {item.result?.top3?.[0]?.[0] || "N/A"} (
+                          {item.result?.confidence != null
+                            ? `${(item.result.confidence * 100).toFixed(1)}%`
+                            : "--"}
+                          )
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : (
+              <div className="profile-view">
+                <h4>Account Profile</h4>
+                <p>
+                  <strong>Username:</strong> {user.username}
+                </p>
+                <p>
+                  <strong>Email:</strong> {user.email}
+                </p>
+                <p>
+                  <strong>Predictions made:</strong> {history.length}
+                </p>
+                <p>
+                  <strong>2FA:</strong>{" "}
+                  {user.totp_enabled === "true" ? "Enabled" : "Disabled"}
+                </p>
+              </div>
+            )}
+          </div>
+        </aside>
+      )}
 
       <div className="main-content">
         <header className="hero-section">
-          <h1>Health AI Diagnosis Dashboard</h1>
+          <h1>🏥 Health AI Diagnosis</h1>
           <p>
-            AI-assisted symptom analysis with real-time disease risk evaluation.
+            {guestMode
+              ? "AI-assisted symptom analysis (Guest Mode - No history will be saved)"
+              : "AI-assisted symptom analysis with real-time disease risk evaluation."}
           </p>
+          {guestMode && (
+            <button 
+              className="secondary" 
+              onClick={() => {
+                setPage("home");
+                handleLogout();
+              }}
+              style={{ marginTop: "12px" }}
+            >
+              Login to Save History
+            </button>
+          )}
         </header>
 
         <div className="section-controls">
@@ -561,7 +569,7 @@ function App() {
                   {availableSymptoms.slice(0, 24).map((symptom) => (
                     <button
                       key={symptom}
-                      className="chip"
+                      className={`chip ${symptoms.includes(symptom.toLowerCase()) ? "selected" : ""}`}
                       onClick={() => addSymptom(symptom)}
                     >
                       {symptom.replace(/_/g, " ")}
@@ -577,24 +585,30 @@ function App() {
                     placeholder="Add comma-separated symptoms"
                   />
                   <button
+                    type="button"
                     onClick={() => {
                       symptomText
                         .split(",")
                         .map((token) => token.trim())
                         .filter(Boolean)
                         .forEach((token) => addSymptom(token));
+                      setSymptomText("");
                     }}
                   >
                     + Add
                   </button>
                 </div>
 
-                <div className="chips selected">
+                <div className="chips">
                   {symptoms.map((sym) => (
                     <span key={sym} className="chip selected">
                       {sym}
-                      <button onClick={() => removeSymptom(sym)}>
-                        &times;
+                      <button 
+                        type="button"
+                        onClick={() => removeSymptom(sym)}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", marginLeft: "4px" }}
+                      >
+                        ×
                       </button>
                     </span>
                   ))}
@@ -711,5 +725,4 @@ function App() {
     </div>
   );
 }
-
 export default App;
