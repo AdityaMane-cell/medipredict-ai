@@ -99,7 +99,7 @@ npm run dev
 ### Backend API
 
 - **URL**: `http://localhost:8000`
-- **Database**: SQLite (`healthai.db` in project root)
+- **Database**: Postgresql (`healthai.db` in project root)
 - **Endpoints**:
   - `POST /register` - Create account
   - `POST /token` - Login
@@ -222,14 +222,14 @@ health-ai-project/
 ### Debug Backend
 
 - Uvicorn logs appear in terminal
-- SQLite database stored as file
+- PostgreSQL database running on localhost:5432
 - Check Console tab for Python errors
 
 ### Deploy Later
 
-- Use Docker: Already have `Dockerfile`
-- Update `.env` for production
-- Use proper database (PostgreSQL)
+- Use Docker: Already have `Dockerfile` and `docker-compose.yml` with PostgreSQL
+- Update `.env` for production database URL
+- Configure environment variables for production
 - Add HTTPS/SSL
 
 ---

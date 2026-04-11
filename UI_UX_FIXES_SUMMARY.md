@@ -67,10 +67,10 @@
 
 ### Backend Setup
 
-1. **Database**: Switched from PostgreSQL to SQLite
+1. **Database**: PostgreSQL
    - File: `api/db.py`
-   - Change: PostgreSQL URL → `sqlite:///./healthai.db`
-   - Reason: Simplifies local development, no external DB needed
+   - Configuration: `postgresql://postgres:backend-sprint@localhost:5432/healthai`
+   - Required: PostgreSQL 14+ running locally or via Docker
 
 2. **Dependencies**: Installed missing packages
    - `python-multipart`: Required for form data handling in FastAPI
@@ -93,7 +93,7 @@
 
 - URL: `http://localhost:8000`
 - Status: Running with hot reload
-- Database: SQLite at `healthai.db`
+- Database: PostgreSQL at `localhost:5432/healthai`
 
 ✅ **Frontend** (Vite + React)
 

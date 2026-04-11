@@ -5,6 +5,10 @@
 import joblib
 import numpy as np
 import os
+import warnings
+from sklearn.exceptions import InconsistentVersionWarning
+
+warnings.filterwarnings('ignore', category=InconsistentVersionWarning)
 
 MODEL_DIR = os.getenv('MODEL_DIR', os.path.join(os.path.dirname(__file__), '../../ml/models'))
 
