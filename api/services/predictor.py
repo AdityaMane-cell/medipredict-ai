@@ -12,6 +12,23 @@ warnings.filterwarnings('ignore', category=InconsistentVersionWarning)
 
 MODEL_DIR = os.getenv('MODEL_DIR', os.path.join(os.path.dirname(__file__), '../../ml/models'))
 
+SYMPTOM_SYNONYMS = {
+    'rash': 'skin_rash',
+    'fever': 'high_fever',
+    'high_fever': 'high_fever',
+    'itchy': 'itching',
+    'head_pain': 'headache',
+    'head_ache': 'headache',
+    'sore_throat': 'sore_throat',
+    'nodal_eruption': 'nodal_skin_eruption',
+    'nodal_eruptions': 'nodal_skin_eruption',
+    'back_pain': 'back_pain',
+    'stomach_pain': 'stomach_pain',
+    'joint_pain': 'joint_pain',
+    'runny_nose': 'runny_nose',
+    'muscle_pain': 'muscle_pain',
+}
+
 severe_diseases = {
     'AIDS', 'Cervical cancer', 'Diabetes',
     'Fungal infection', 'Osteoarthritis', 'Varicose veins'
@@ -72,6 +89,7 @@ def sanitize_symptoms(symptoms):
         if not isinstance(s, str):
             continue
         normalized = normalize(s)
+        normalized = SYMPTOM_SYNONYMS.get(normalized, normalized)
         if len(normalized) > 0 and len(normalized) < 128:
             safe.append(normalized)
     return safe

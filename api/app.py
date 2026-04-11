@@ -34,7 +34,12 @@ from api.services.nlp_parser import text_to_symptoms
 import uuid
 from datetime import datetime, timedelta
 
-models.Base.metadata.create_all(bind=engine)
+if os.getenv('CREATE_TABLES_ON_STARTUP', 'false').lower() in ('1', 'true', 'yes'):
+    try:
+        models.Base.metadata.create_all(bind=engine)
+    except Exception as exc:
+        logger = logging.getLogger('health-ai-api')
+        logger.warning('Database table creation skipped or failed on import: %s', exc)
 
 # logging + observability
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
