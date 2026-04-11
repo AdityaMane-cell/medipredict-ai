@@ -14,7 +14,7 @@ from slowapi.util import get_remote_address
 from starlette.responses import JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from db import SessionLocal, engine
+from api.db import SessionLocal, engine
 from api import models
 from api.schemas import (
     UserCreate,
