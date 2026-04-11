@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import datetime
+from typing import Any
 
 # Structured logging formatter for JSON export
 
@@ -34,7 +35,7 @@ class StructuredLogger:
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         }))
 
-    def log_error(self, error_code: str, message: str, context: dict = None):
+    def log_error(self, error_code: str, message: str, context: dict[str, Any] | None = None):
         self.logger.error(json.dumps({
             'event': 'error',
             'code': error_code,

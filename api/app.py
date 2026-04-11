@@ -2,14 +2,14 @@ from fastapi import FastAPI, Depends, HTTPException, status, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, cast
 import json
 import logging
 import os
 import pyotp
 from datetime import datetime, timedelta
-
 from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -32,24 +32,26 @@ from api.services.nlp_parser import text_to_symptoms
 
 # password reset imports
 import uuid
-from datetime import datetime, timedelta
-
-if os.getenv('CREATE_TABLES_ON_STARTUP', 'false').lower() in ('1', 'true', 'yes'):
-    try:
-        models.Base.metadata.create_all(bind=engine)
-    except Exception as exc:
-        logger = logging.getLogger('health-ai-api')
-        logger.warning('Database table creation skipped or failed on import: %s', exc)
 
 # logging + observability
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger('health-ai-api')
 
+if os.getenv('CREATE_TABLES_ON_STARTUP', 'false').lower() in ('1', 'true', 'yes'):
+    try:
+        models.Base.metadata.create_all(bind=engine)
+    except Exception as exc:
+        logger.warning('Database table creation skipped or failed on import: %s', exc)
+
+
+def _rate_limit_handler(request: Request, exc: Exception) -> JSONResponse:
+    return _rate_limit_exceeded_handler(request, cast(RateLimitExceeded, exc))
+
 limiter = Limiter(key_func=get_remote_address, default_limits=["30/minute", "1000/hour"])
 
 app = FastAPI(title='Health AI - Symptom Prediction API')
 app.state.limiter = limiter
-app.add_exception_handler(429, _rate_limit_exceeded_handler)
+app.add_exception_handler(429, _rate_limit_handler)
 
 # in-memory token map for password reset demo; replace with DB in production
 PASSWORD_RESET_TOKENS = {}
@@ -114,7 +116,8 @@ def get_optional_user(authorization: Optional[str] = Header(None), db: Session =
 
 
 def check_and_increment_lockout(user: models.User, db: Session):
-    if user.account_locked_until and user.account_locked_until > datetime.utcnow():
+    lockout_until = cast(datetime | None, user.account_locked_until)
+    if lockout_until and lockout_until > datetime.utcnow():
         raise HTTPException(status_code=423, detail='Account locked. Try again later.')
 
     user.failed_login_attempts += 1
@@ -195,7 +198,8 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Incorrect username or password')
 
-    if user.account_locked_until and user.account_locked_until > datetime.utcnow():
+    lockout_until = cast(datetime | None, user.account_locked_until)
+    if lockout_until and lockout_until > datetime.utcnow():
         raise HTTPException(status_code=status.HTTP_423_LOCKED, detail='Account locked. Try again later.')
 
     if not verify_password(form_data.password, user.hashed_password):
@@ -205,7 +209,8 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
     # 2FA check if enabled
     if user.totp_enabled == 'true':
         otp_code = request.headers.get('x-totp-code')
-        if not otp_code or not verify_totp_code(user.totp_secret, otp_code):
+        totp_secret = cast(str | None, user.totp_secret)
+        if not otp_code or not totp_secret or not verify_totp_code(totp_secret, otp_code):
             check_and_increment_lockout(user, db)
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid 2FA code')
 
@@ -234,7 +239,8 @@ def setup_totp(current_user: models.User = Depends(get_current_user), db: Sessio
 def enable_totp(code: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not current_user.totp_secret:
         raise HTTPException(status_code=400, detail='TOTP setup not completed')
-    if verify_totp_code(current_user.totp_secret, code):
+    current_secret = cast(str, current_user.totp_secret)
+    if verify_totp_code(current_secret, code):
         current_user.totp_enabled = 'true'
         db.commit()
         return {'message': '2FA enabled'}
@@ -245,7 +251,8 @@ def enable_totp(code: str, current_user: models.User = Depends(get_current_user)
 def disable_totp(code: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     if current_user.totp_enabled != 'true':
         return {'message': '2FA already disabled'}
-    if verify_totp_code(current_user.totp_secret, code):
+    totp_secret = cast(str | None, current_user.totp_secret)
+    if totp_secret and verify_totp_code(totp_secret, code):
         current_user.totp_enabled = 'false'
         current_user.totp_secret = None
         db.commit()

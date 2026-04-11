@@ -1,7 +1,7 @@
 from rapidfuzz import process
 from api.services.predictor import available_symptoms
 
-VALID_SYMPTOMS = None
+VALID_SYMPTOMS: set[str] | None = None
 
 SYMPTOM_MAP = {
     'rash': 'skin_rash',
@@ -25,6 +25,7 @@ def text_to_symptoms(text: str):
     global VALID_SYMPTOMS
     if VALID_SYMPTOMS is None:
         VALID_SYMPTOMS = set(available_symptoms())
+    valid_symptoms = VALID_SYMPTOMS
 
     text = str(text or '').lower().strip()
     if not text:
@@ -56,7 +57,7 @@ def text_to_symptoms(text: str):
     for chunk in candidate_chunks:
         if not chunk:
             continue
-        match, score, _ = process.extractOne(chunk, VALID_SYMPTOMS)
+        match, score, _ = process.extractOne(chunk, valid_symptoms)
         if score >= 85:
             extracted.add(match)
 
