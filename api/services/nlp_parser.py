@@ -25,6 +25,7 @@ def text_to_symptoms(text: str):
     global VALID_SYMPTOMS
     if VALID_SYMPTOMS is None:
         VALID_SYMPTOMS = set(available_symptoms())
+    assert VALID_SYMPTOMS is not None
     valid_symptoms = VALID_SYMPTOMS
 
     text = str(text or '').lower().strip()
@@ -46,7 +47,7 @@ def text_to_symptoms(text: str):
 
     for token in tokens:
         normalized = token.replace(' ', '_')
-        if normalized in VALID_SYMPTOMS:
+        if normalized in valid_symptoms:
             extracted.add(normalized)
 
     candidate_chunks = []
@@ -57,7 +58,10 @@ def text_to_symptoms(text: str):
     for chunk in candidate_chunks:
         if not chunk:
             continue
-        match, score, _ = process.extractOne(chunk, valid_symptoms)
+        result = process.extractOne(chunk, valid_symptoms)
+        if result is None:
+            continue
+        match, score, _ = result
         if score >= 85:
             extracted.add(match)
 

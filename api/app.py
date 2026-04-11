@@ -11,10 +11,10 @@ from datetime import datetime, timedelta
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from api.db import SessionLocal, engine
+from db import SessionLocal, engine
 from api import models
 from api.schemas import (
     UserCreate,
@@ -44,7 +44,7 @@ if os.getenv('CREATE_TABLES_ON_STARTUP', 'false').lower() in ('1', 'true', 'yes'
         logger.warning('Database table creation skipped or failed on import: %s', exc)
 
 
-def _rate_limit_handler(request: Request, exc: Exception) -> JSONResponse:
+def _rate_limit_handler(request: Request, exc: Exception) -> Response:
     return _rate_limit_exceeded_handler(request, cast(RateLimitExceeded, exc))
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["30/minute", "1000/hour"])
@@ -175,7 +175,8 @@ def password_reset(token: str, new_password: str, db: Session = Depends(get_db))
         raise HTTPException(status_code=400, detail='Invalid token')
 
     data = PASSWORD_RESET_TOKENS[token]
-    if data['expires_at'] < datetime.utcnow():
+    expires_at = data.get('expires_at')
+    if not isinstance(expires_at, datetime) or expires_at < datetime.utcnow():
         del PASSWORD_RESET_TOKENS[token]
         raise HTTPException(status_code=400, detail='Token expired')
 
