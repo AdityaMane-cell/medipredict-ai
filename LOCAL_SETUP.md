@@ -101,6 +101,9 @@ MODEL_DIR=ml/models
 # Navigate to project root
 cd \filepath\...\medipredict-ai
 
+# Setup virtural envirment for python
+python -m venv venv
+
 # Activate virtual environment (if not already activated)
 .\venv\Scripts\Activate.ps1
 
@@ -143,7 +146,7 @@ curl http://localhost:8000/health
 
 ```bash
 # In another terminal, navigate to web folder
-cd \filepath\...\medipredict-ai  \web
+cd \filepath\...\medipredict-ai\web
 
 # Install Node dependencies
 npm install
