@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List, Optional, cast
 import json
 import logging
@@ -263,8 +264,21 @@ def disable_totp(code: str, current_user: models.User = Depends(get_current_user
 
 @app.get('/health')
 def health_check():
-    return {'status': 'ok', 'timestamp': datetime.utcnow().isoformat() + 'Z'}
+    db_status = {"status": "unknown"}
+    try:
+        # Test actual DB connection
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+            db.commit()
+        db_status = {"status": "connected"}
+    except Exception as e:
+        db_status = {"status": "disconnected", "detail": str(e)[:300]}
 
+    return {
+        'status': 'ok',
+        'timestamp': datetime.utcnow().isoformat() + 'Z',
+        'database': db_status
+    }
 
 @app.get('/metrics')
 def prometheus_metrics():
