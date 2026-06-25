@@ -65,7 +65,7 @@ sudo -u postgres createdb healthai
 
 ```bash
 # Navigate to project root
-cd f:\EPIC\CODING\Projects\health-ai-project
+cd \filepath\...\medipredict-ai
 
 # Copy environment template
 cp .env.example .env
@@ -99,7 +99,7 @@ MODEL_DIR=ml/models
 
 ```bash
 # Navigate to project root
-cd f:\EPIC\CODING\Projects\health-ai-project
+cd \filepath\...\medipredict-ai
 
 # Activate virtual environment (if not already activated)
 .\venv\Scripts\Activate.ps1
@@ -143,7 +143,7 @@ curl http://localhost:8000/health
 
 ```bash
 # In another terminal, navigate to web folder
-cd f:\EPIC\CODING\Projects\health-ai-project\web
+cd \filepath\...\medipredict-ai  \web
 
 # Install Node dependencies
 npm install
@@ -260,7 +260,7 @@ taskkill /PID <PID> /F
 
 ```bash
 # Backend
-cd f:\EPIC\CODING\Projects\health-ai-project
+cd \filepath\...\medipredict-ai
 .\venv\Scripts\Activate.ps1
 uvicorn api.app:app --reload --host 0.0.0.0 --port 8000
 
