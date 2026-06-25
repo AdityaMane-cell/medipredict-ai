@@ -240,4 +240,15 @@ MIT (or your chosen license)
 
 ---
 
+## 💡 Next Iteration (Roadmap)
+
+1. **Advanced Auth** – OAuth2, SAML, enterprise SSO
+2. **Observability** – Sentry, Prometheus, Grafana
+3. **ML Ops** – MLflow, weekly retraining, drift detection
+4. **Enterprise** – RBAC, audit logs, HIPAA compliance
+5. **Scale** – Redis, Kubernetes, CDN
+6. **Community** – API SDK generation, CLI tool
+
+---
+
 **Status**: Production-ready MVP with enterprise security & observability ✅
