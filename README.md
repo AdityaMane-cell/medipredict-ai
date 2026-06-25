@@ -1,4 +1,4 @@
-# Production-Grade Health AI System
+# MediPredict: Production-Grade Health AI System
 Comprehensive AI-powered health diagnosis tool with enterprise-grade security, observability, and model governance.
 
 ### ✨ Key Features
